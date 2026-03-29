@@ -172,7 +172,7 @@ export default function Home() {
       </section>
 
       {/* Dr. Mehar Section */}
-      <section className="py-24 bg-white dark:bg-[#050b14] overflow-hidden">
+      <section className="py-24 bg-white overflow-hidden">
         <div className="container mx-auto px-6">
           <div className="flex flex-col lg:flex-row gap-16 items-start">
             {/* Left: Dr. Mehar Portrait */}
@@ -284,7 +284,7 @@ export default function Home() {
       </section>
 
       {/* Journey of Impact Section */}
-      <section className="py-24 bg-white dark:bg-[#050b14] overflow-hidden">
+      <section className="py-24 bg-white overflow-hidden">
         <div className="container mx-auto px-6">
           <h2 className="text-4xl md:text-5xl font-black mb-12 text-[#1e293b] leading-tight max-w-2xl">
             Celebrating Success: Dr. Mehar&apos;s <br />

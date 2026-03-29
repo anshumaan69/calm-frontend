@@ -391,8 +391,37 @@ export default function SessionReviewPage() {
             </div>
 
             {/* BOTTOM DRAFT NOTE */}
-            <div className="flex items-center justify-center pt-8 border-t border-slate-50">
+            <div className="flex items-center justify-between pt-8 border-t border-slate-50">
                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Last updated: {new Date().toLocaleTimeString()}</p>
+            </div>
+
+            {/* SUGGESTED READING (Aesthetic Books) */}
+            <div className="pt-12 space-y-8">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 bg-[#5d5dff] rounded-full"></div>
+                <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">SUGGESTED CLINICAL READING</h3>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-6">
+                {[
+                  { title: "Cognitive Resonance", img: "/assets/books/aesthetic_clinical_books_1_1774787659003.png" },
+                  { title: "Behavioral Patterns", img: "/assets/books/aesthetic_clinical_books_2_1774787678075.png" },
+                  { title: "Therapeutic Alliances", img: "/assets/books/aesthetic_clinical_books_3_1774787695784.png" }
+                ].map((book, i) => (
+                  <div key={i} className="group cursor-pointer">
+                    <div className="relative aspect-[3/4] rounded-3xl overflow-hidden shadow-sm mb-3">
+                      <img 
+                        src={book.img} 
+                        alt={book.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate px-1">{book.title}</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 px-1 truncate">Clinical Resource</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

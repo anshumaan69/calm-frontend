@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://140e-2401-4900-8fd9-3c92-60fe-1f72-ed0c-4f2f.ngrok-free.app';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
 async function fetcher(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
