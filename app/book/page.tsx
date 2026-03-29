@@ -631,10 +631,19 @@ export default function BookingPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {displayBooks.map(book => {
                   const isInCart = cart.includes(book._id);
+                  
+                  // Map specific titles to local assets if backend image is missing
+                  let bookImage = book.image || "/book1.png";
+                  if (!book.image || book.image === "/book1.png") {
+                    if (book.title.toLowerCase().includes("test book")) bookImage = "/assets/books/test_book_cover.png";
+                    else if (book.title.toLowerCase().includes("physical test")) bookImage = "/assets/books/physical_test_cover.png";
+                    else if (book.title.toLowerCase().includes("checkout book")) bookImage = "/assets/books/checkout_book_cover.png";
+                  }
+
                   return (
                     <div key={book._id} className="group">
                       <div className="relative aspect-[3/4] rounded-2xl overflow-hidden mb-3 bg-slate-100 border-2 border-transparent group-hover:border-cyan-300 transition-all">
-                        <Image src={book.image || "/book1.png"} alt={book.title} fill className="object-cover" sizes="150px" />
+                        <Image src={bookImage} alt={book.title} fill className="object-cover" sizes="150px" />
                       </div>
                       <p className="text-xs font-black text-slate-700 line-clamp-1 mb-1">{book.title}</p>
                       <p className="text-sm font-black text-slate-800 mb-2">₹{book.price}</p>
