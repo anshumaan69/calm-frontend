@@ -1,0 +1,4232 @@
+﻿Deployed url :https://calmiscious.hoocaitechnologies.com/
+
+
+MODULE: ACCOUNT (Save & Fetch Account Details)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+ — Payment flow dependency)
+
+
+1. SAVE ACCOUNT API
+Endpoint
+
+
+POST /api/account
+Auth
+
+
+Required (JWT → req.user.id)
+Request Payload
+JSON
+
+
+{
+  "upiId": "user@upi",
+  "accountNumber": "123456789012",
+  "ifsc": "HDFC0001234",
+  "accountHolderName": "John Doe"
+}
+Processing Logic
+Extract userId from JWT
+
+
+Validate UPI (regex)
+
+
+Encrypt accountNumber using AES-256-CBC
+
+
+Upsert account (1 account per user)
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Saved",
+  "data": {
+    "_id": "65f1a8...",
+    "userId": "USER_001",
+    "upiId": "user@upi",
+    "accountNumber": "iv:encrypted_string",
+    "ifsc": "HDFC0001234",
+    "accountHolderName": "John Doe",
+    "isVerified": false,
+    "createdAt": "2026-03-25T10:00:00Z",
+    "updatedAt": "2026-03-25T10:00:00Z"
+  }
+}
+Error Responses
+Invalid UPI
+JSON
+
+
+{
+  "statusCode": 500,
+  "message": "Invalid UPI ID"
+}
+Unauthorized
+JSON
+
+
+{
+  "statusCode": 401,
+  "message": "Unauthorized"
+}
+DB Behavior
+userId is unique
+
+
+Acts as UPSERT
+
+
+Only one account per user
+
+
+2. GET ACCOUNT API
+Endpoint
+
+
+GET /api/account
+Auth
+
+
+Required (JWT → req.user.id)
+Request
+
+
+No body
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Fetched",
+  "data": {
+    "_id": "65f1a8...",
+    "userId": "USER_001",
+    "upiId": "user@upi",
+    "accountNumber": "iv:encrypted_string",
+    "ifsc": "HDFC0001234",
+    "accountHolderName": "John Doe",
+    "isVerified": false,
+    "createdAt": "2026-03-25T10:00:00Z",
+    "updatedAt": "2026-03-25T10:00:00Z"
+  }
+}
+Notes
+accountNumber is encrypted
+
+
+No decryption in API (security)
+
+
+Used internally only when required
+
+
+3. FRONTEND INTEGRATION GUIDE
+Save Account Flow
+Step 1: Form Fields
+UPI ID (optional)
+
+
+Account Number (optional)
+
+
+IFSC
+
+
+Account Holder Name
+
+
+Step 2: API Call
+JavaScript
+
+
+await axios.post("/api/account", formData, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
+Step 3: Validation (Frontend)
+UPI format check (optional mirror of backend)
+
+
+Require at least:
+
+
+UPI OR bank details
+
+
+Step 4: UX Handling
+Show loader on submit
+
+
+On success → “Account saved”
+
+
+On error → show backend message
+
+
+Get Account Flow
+Step 1: API Call
+JavaScript
+
+
+const res = await axios.get("/api/account", {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
+Step 2: Populate UI
+Pre-fill form fields
+
+
+Mask account number:
+
+
+JavaScript
+
+
+**** **** **** 1234
+4. SECURITY NOTES (MANDATORY)
+AES-256 encryption for account number
+
+
+Never expose decrypted account number
+
+
+ACCOUNT_SECRET must be 64 hex chars
+
+
+JWT required for all routes
+
+
+Unique constraint prevents duplicate accounts
+
+
+5. FUTURE EXTENSIONS (PRODUCTION)
+Add Razorpay account verification
+
+
+Add penny-drop verification
+
+
+Add webhook-based verification → set isVerified = true
+
+
+Add audit logs
+
+
+MODULE: ADMIN (Payments, Stats, Settings)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+ — Admin control layer)
+
+
+1. GET ALL PAYMENTS
+Endpoint
+http
+
+
+GET /api/admin/payments
+Auth
+
+
+Required (ADMIN / SUPER_ADMIN)
+Query Params
+JSON
+
+
+{
+  "status": "SUCCESS | FAILED | PENDING", 
+  "page": 1,
+  "limit": 100
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Fetched admin payments",
+  "data": [
+    {
+      "_id": "PAY_001",
+      "appointmentId": "APT_001",
+      "amount": 500,
+      "status": "SUCCESS",
+      "createdAt": "2026-03-25T10:00:00Z",
+
+
+      "appointment": {
+        "_id": "APT_001",
+        "userId": "USER_001",
+        "doctorId": "DOC_001",
+        "status": "CONFIRMED"
+      },
+
+
+      "patient": {
+        "name": "John Doe",
+        "email": "john@example.com"
+      },
+
+
+      "doctor": {
+        "name": "Dr. Smith"
+      }
+    }
+  ]
+}
+Description
+Fetch all payments
+
+
+Supports pagination + status filter
+
+
+Enriches:
+
+
+Appointment
+
+
+Patient
+
+
+Doctor
+
+
+Uses batch queries (optimized)
+
+
+2. GET ADMIN STATS
+Endpoint
+http
+
+
+GET /api/admin/stats
+Auth
+
+
+Required (ADMIN / SUPER_ADMIN)
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Fetched admin stats",
+  "data": {
+    "revenue": 250000,
+    "appointments": 120,
+    "pendingApprovals": 5
+  }
+}
+Description
+revenue → Sum of SUCCESS payments
+
+
+appointments → CONFIRMED appointments
+
+
+pendingApprovals → Doctors not verified
+
+
+3. GET SETTINGS
+Endpoint
+http
+
+
+GET /api/admin/settings
+Auth
+
+
+Required (ADMIN / SUPER_ADMIN)
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Fetched settings",
+  "data": [
+    {
+      "_id": "SET_001",
+      "key": "SESSION_PRICE",
+      "value": 2499,
+      "description": "Session base price",
+      "updatedAt": "2026-03-25T10:00:00Z"
+    }
+  ]
+}
+Description
+Fetch all system configs
+
+
+Dynamic key-value storage
+
+
+4. UPDATE SETTINGS
+Endpoint
+http
+
+
+PATCH /api/admin/settings
+Auth
+
+
+Required (ADMIN / SUPER_ADMIN)
+Request Payload
+JSON
+
+
+{
+  "SESSION_PRICE": 2999,
+  "PLATFORM_FEE": 200
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Settings updated",
+  "data": [
+    {
+      "_id": "SET_001",
+      "key": "SESSION_PRICE",
+      "value": 2999
+    },
+    {
+      "_id": "SET_002",
+      "key": "PLATFORM_FEE",
+      "value": 200
+    }
+  ]
+}
+Description
+Bulk upsert settings
+
+
+Each key updated independently
+
+
+Supports dynamic configs
+
+
+5. FRONTEND INTEGRATION GUIDE
+Payments Dashboard
+API Call
+JavaScript
+
+
+await axios.get("/api/admin/payments?status=SUCCESS&page=1&limit=20", {
+  headers: { Authorization: `Bearer ${token}` }
+});
+UI Mapping
+Table columns:
+
+
+Payment ID
+
+
+Amount
+
+
+Status
+
+
+Patient Name
+
+
+Doctor Name
+
+
+Date
+
+
+Pagination
+Use page & limit
+
+
+Infinite scroll or table pagination
+
+
+Stats Dashboard
+API Call
+JavaScript
+
+
+await axios.get("/api/admin/stats", {
+  headers: { Authorization: `Bearer ${token}` }
+});
+UI Components
+Revenue Card
+
+
+Total Appointments
+
+
+Pending Approvals
+
+
+Settings Panel
+Fetch Settings
+JavaScript
+
+
+const res = await axios.get("/api/admin/settings", {
+  headers: { Authorization: `Bearer ${token}` }
+});
+Convert Array → Object
+JavaScript
+
+
+const settings = {};
+res.data.data.forEach(s => {
+  settings[s.key] = s.value;
+});
+Update Settings
+API Call
+JavaScript
+
+
+await axios.patch("/api/admin/settings", {
+  SESSION_PRICE: 2999,
+  PLATFORM_FEE: 200
+}, {
+  headers: { Authorization: `Bearer ${token}` }
+});
+UX
+Editable form
+
+
+Save button
+
+
+Success toast
+
+
+6. DB INDEXING (PRODUCTION)
+Payment:
+
+
+JavaScript
+
+
+{ status: 1, createdAt: -1 }
+Appointment:
+
+
+JavaScript
+
+
+{ status: 1 }
+User:
+
+
+JavaScript
+
+
+{ role: 1, isVerified: 1 }
+SystemSetting:
+
+
+JavaScript
+
+
+{ key: 1 } // unique
+7. SECURITY NOTES
+Strict RBAC (ADMIN / SUPER_ADMIN)
+
+
+No public access
+
+
+Settings are critical → log every change
+
+
+Validate keys in production (whitelist)
+
+
+MODULE: APPOINTMENT (Booking → Payment → Confirmation → Cancellation)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+   🔹 ENUMS
+JSON
+
+
+APPOINTMENT_STATUS = {
+  "CREATED": "CREATED",
+  "CONFIRMED": "CONFIRMED",
+  "CANCELLED": "CANCELLED",
+  "FAILED": "FAILED"
+}
+🔹 BASE CONFIG
+Base URL: /api/appointments
+
+
+Auth: Bearer JWT
+
+
+Headers:
+
+
+JSON
+
+
+{
+  "Authorization": "Bearer <token>",
+  "Content-Type": "application/json"
+}
+🔹 1. GET PRICING
+📌 Endpoint
+GET /config/pricing
+
+
+❌ Auth Required: NO
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "amount": 500
+  },
+  "message": "Price fetched"
+}
+📌 Description
+Fetch consultation price from admin config.
+
+
+💻 FRONTEND GUIDE
+Call before booking screen
+
+
+Show price on UI
+
+
+Store in state for Razorpay
+
+
+🔹 2. CREATE APPOINTMENT
+📌 Endpoint
+POST /
+
+
+🔐 Auth Required: YES (PATIENT)
+✅ Request Body
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "startTime": "2026-03-30T10:00:00.000Z",
+  "endTime": "2026-03-30T10:30:00.000Z",
+  "locationId": "LOC_001",
+  "manualAddress": "Optional",
+  "problem": "Anxiety issues"
+}
+⚠️ Alternate Body (Slot-based)
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "date": "2026-03-30",
+  "slotId": "10:00",
+  "problem": "Anxiety issues"
+}
+✅ Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "data": {
+    "_id": "apt_object_id",
+    "doctorId": "DOC_001",
+    "userId": "user_object_id",
+    "startTime": "2026-03-30T10:00:00.000Z",
+    "endTime": "2026-03-30T10:30:00.000Z",
+    "status": "CREATED",
+    "orderId": "order_1710000000000"
+  },
+  "message": "Created"
+}
+❌ Errors
+JSON
+
+
+{
+  "message": "Timeframe 10:00 is no longer available"
+}
+JSON
+
+
+{
+  "message": "Professional identifier mismatch in booking engine"
+}
+📌 Description
+Validates slot availability
+
+
+Generates internal orderId
+
+
+Creates appointment in CREATED state
+
+
+💻 FRONTEND GUIDE
+FLOW:
+
+
+Select doctor
+
+
+Select slot
+
+
+Call API
+
+
+Store:
+
+
+appointmentId
+
+
+orderId
+
+
+👉 Immediately after this → trigger Razorpay
+
+
+🔹 3. GET SINGLE APPOINTMENT
+📌 Endpoint
+GET /:id
+
+
+🔐 Auth Required: YES
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "apt_id",
+    "doctorId": "DOC_001",
+    "userId": "user_id",
+    "doctorName": "Dr. Sharma",
+    "patientName": "Rahul",
+    "patientPhone": "9999999999",
+    "startTime": "2026-03-30T10:00:00.000Z",
+    "endTime": "2026-03-30T10:30:00.000Z",
+    "status": "CONFIRMED",
+    "meetLink": "https://meet.google.com/abc",
+    "receiptPath": "/receipts/apt.pdf",
+    "amount": 500
+  },
+  "message": "Fetched"
+}
+📌 Description
+Returns enriched appointment:
+
+
+Doctor name
+
+
+Patient info
+
+
+Payment amount
+
+
+Meet link
+
+
+Receipt
+
+
+💻 FRONTEND GUIDE
+Use for:
+
+
+Appointment detail page
+
+
+After payment success
+
+
+Show:
+
+
+Meet link
+
+
+Receipt download
+
+
+🔹 4. LIST PATIENT APPOINTMENTS
+📌 Endpoint
+GET /
+OR
+GET /patient/me
+
+
+🔐 Auth Required: YES (PATIENT)
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "apt_id",
+      "doctorId": "DOC_001",
+      "startTime": "...",
+      "status": "CONFIRMED"
+    }
+  ],
+  "message": "Fetched"
+}
+📌 Description
+Returns all appointments of logged-in user.
+
+
+💻 FRONTEND GUIDE
+Dashboard → “My Sessions”
+
+
+Sort already handled (latest first)
+
+
+🔹 5. LIST DOCTOR APPOINTMENTS
+📌 Endpoint
+GET /doctor/me
+
+
+🔐 Auth Required: YES (DOCTOR / ADMIN)
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "apt_id",
+      "userId": "user_id",
+      "startTime": "...",
+      "status": "CONFIRMED"
+    }
+  ],
+  "message": "Fetched"
+}
+📌 Description
+Doctor queue (all assigned sessions)
+
+
+💻 FRONTEND GUIDE
+Doctor dashboard
+
+
+Show upcoming sessions
+
+
+Enable “Join Meet”
+
+
+🔹 6. CONFIRM APPOINTMENT (PAYMENT SUCCESS)
+📌 Endpoint
+POST /:id/confirm
+
+
+🔐 Auth Required: YES
+✅ Request Body
+JSON
+
+
+{
+  "razorpay_order_id": "order_1710000000000",
+  "razorpay_payment_id": "pay_123456",
+  "razorpay_signature": "signature_hash"
+}
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "apt_id",
+    "status": "CONFIRMED",
+    "meetLink": "https://meet.google.com/abc",
+    "receiptPath": "/receipts/apt.pdf"
+  },
+  "message": "Confirmed"
+}
+❌ Errors
+JSON
+
+
+{
+  "message": "Slot already taken by another confirmed appointment"
+}
+📌 Description
+Triggers full pipeline:
+
+
+Payment validation
+
+
+Double-booking check
+
+
+Google Meet creation
+
+
+Receipt generation
+
+
+Recall bot creation (async)
+
+
+Status → CONFIRMED
+
+
+💻 FRONTEND GUIDE
+🔥 CRITICAL FLOW:
+
+
+After Razorpay success:
+
+
+JavaScript
+
+
+await POST /appointments/:id/confirm
+Then:
+
+
+Redirect → Success page
+
+
+Fetch appointment → show meet link
+
+
+🔹 7. CANCEL APPOINTMENT
+📌 Endpoint
+PATCH /:id/cancel
+
+
+🔐 Auth Required: YES
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": null,
+  "message": "Cancelled"
+}
+📌 Description
+Cancels appointment
+
+
+If paid → triggers refund queue
+
+
+💻 FRONTEND GUIDE
+Add “Cancel” button
+
+
+Disable if:
+
+
+Already cancelled
+
+
+Session started
+
+
+🔹 SYSTEM BEHAVIOR (IMPORTANT)
+🔒 DOUBLE BOOKING PROTECTION
+DB-level unique index:
+
+
+JavaScript
+
+
+doctorId + startTime + status(CONFIRMED)
+⚙️ ASYNC FLOWS
+Confirmation → Queue
+
+
+Refund → Queue
+
+
+Bot → Non-blocking
+
+
+🔁 IDEMPOTENCY
+Re-confirm safe
+
+
+Returns existing CONFIRMED
+
+
+🔹 COMPLETE FRONTEND FLOW (END-TO-END)
+🎯 BOOKING FLOW
+Get Pricing
+
+
+Show Slots
+
+
+Create Appointment → get appointmentId + orderId
+
+
+Open Razorpay
+
+
+On success:
+
+
+Call /confirm
+
+
+Redirect → Success Page
+
+
+Fetch Appointment → show:
+
+
+Meet Link
+
+
+Receipt
+
+
+🎯 DOCTOR FLOW
+Login
+
+
+Call /doctor/me
+
+
+Show upcoming sessions
+
+
+Join via meetLink
+
+
+🎯 CANCEL FLOW
+Click Cancel
+
+
+Call /cancel
+
+
+Show status updated
+
+
+Refund handled async
+
+
+MODULE: AUTH (Google + Credentials + Token + Password Recovery)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+ and Auth Service Flow 
+Pasted code
+
+
+)
+
+
+CONSTANTS
+JSON
+
+
+{
+  "OTP_TYPES": {
+    "RESET_PASSWORD": "RESET_PASSWORD"
+  },
+  "TOKEN_TYPES": {
+    "ACCESS": "ACCESS",
+    "REFRESH": "REFRESH"
+  }
+}
+1. GOOGLE LOGIN
+Endpoint
+http
+
+
+POST /api/auth/google
+Auth
+
+
+Not Required
+Request Payload (Any One)
+JSON
+
+
+{
+  "code": "google_auth_code"
+}
+OR
+
+
+JSON
+
+
+{
+  "idToken": "google_id_token"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "user": {
+      "_id": "USER_001",
+      "email": "user@gmail.com",
+      "name": "John Doe",
+      "role": "PATIENT"
+    },
+    "accessToken": "jwt_access",
+    "refreshToken": "jwt_refresh"
+  }
+}
+Description
+Supports:
+
+
+OAuth code flow
+
+
+ID token verification
+
+
+Auto creates user (PATIENT)
+
+
+Links Google account
+
+
+2. GOOGLE CALLBACK (REDIRECT)
+Endpoint
+http
+
+
+GET /api/auth/google/callback
+Behavior
+Google redirects with ?code=
+
+
+Backend:
+
+
+Exchanges code
+
+
+Generates tokens
+
+
+Redirects to frontend
+
+
+Redirect URL
+
+
+/frontend/auth/callback?token=...&refreshToken=...&userId=...&name=...&email=...&role=...
+3. CREDENTIAL LOGIN
+Endpoint
+http
+
+
+POST /api/auth/login
+Auth
+
+
+Not Required
+Request Payload
+JSON
+
+
+{
+  "identifier": "email OR userId (DOC_001)",
+  "password": "password123"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "user": {
+      "_id": "USER_001",
+      "role": "DOCTOR"
+    },
+    "accessToken": "jwt_access",
+    "refreshToken": "jwt_refresh"
+  }
+}
+Rules
+SUPER_ADMIN → email only
+
+
+Doctor must be approved
+
+
+Supports:
+
+
+email login
+
+
+userId login
+
+
+4. REFRESH TOKEN
+Endpoint
+http
+
+
+POST /api/auth/refresh
+Request Payload
+JSON
+
+
+{
+  "refreshToken": "jwt_refresh"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "accessToken": "new_access_token"
+  }
+}
+Description
+Validates refresh token
+
+
+Issues new access token
+
+
+5. FORGOT PASSWORD (SEND OTP)
+Endpoint
+http
+
+
+POST /api/auth/forgot-password
+Request Payload
+JSON
+
+
+{
+  "email": "user@gmail.com"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "OTP sent",
+  "data": null
+}
+6. VERIFY OTP
+Endpoint
+http
+
+
+POST /api/auth/verify-otp
+Request Payload
+JSON
+
+
+{
+  "email": "user@gmail.com",
+  "otp": "123456"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "OTP verified",
+  "data": null
+}
+7. RESET PASSWORD
+Endpoint
+http
+
+
+POST /api/auth/reset-password
+Request Payload
+JSON
+
+
+{
+  "email": "user@gmail.com",
+  "password": "newPassword123"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Password reset",
+  "data": null
+}
+8. CHANGE PASSWORD (LOGGED IN)
+Endpoint
+http
+
+
+POST /api/auth/change-password
+Auth
+
+
+Required
+Request Payload
+JSON
+
+
+{
+  "oldPassword": "oldPass",
+  "newPassword": "newPass"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Password changed successfully",
+  "data": null
+}
+9. LOGOUT
+Endpoint
+http
+
+
+POST /api/auth/logout
+Auth
+
+
+Required
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Logged out",
+  "data": null
+}
+Description
+Stateless JWT → no server invalidation
+
+
+Frontend deletes tokens
+
+
+10. FRONTEND INTEGRATION GUIDE
+Google Login Flow
+Step 1: Redirect to Google
+JavaScript
+
+
+window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?...";
+Step 2: Handle Callback
+Frontend route:
+
+
+JavaScript
+
+
+/auth/callback
+Step 3: Extract Tokens
+JavaScript
+
+
+const params = new URLSearchParams(window.location.search);
+
+
+const token = params.get("token");
+const refreshToken = params.get("refreshToken");
+Step 4: Store Tokens
+JavaScript
+
+
+localStorage.setItem("accessToken", token);
+localStorage.setItem("refreshToken", refreshToken);
+Credentials Login
+JavaScript
+
+
+await axios.post("/api/auth/login", {
+  identifier,
+  password
+});
+Token Refresh (Interceptor)
+JavaScript
+
+
+axios.interceptors.response.use(null, async (error) => {
+  if (error.response.status === 401) {
+    const res = await axios.post("/api/auth/refresh", {
+      refreshToken: localStorage.getItem("refreshToken")
+    });
+
+
+    localStorage.setItem("accessToken", res.data.data.accessToken);
+  }
+});
+Password Reset Flow
+Step 1: Send OTP
+JavaScript
+
+
+POST /api/auth/forgot-password
+Step 2: Verify OTP
+JavaScript
+
+
+POST /api/auth/verify-otp
+Step 3: Reset Password
+JavaScript
+
+
+POST /api/auth/reset-password
+11. SECURITY NOTES
+JWT:
+
+
+Access → short-lived
+
+
+Refresh → 7 days
+
+
+OTP:
+
+
+In-memory (use Redis in prod)
+
+
+Password:
+
+
+Argon2 hashing
+
+
+Rate limiting:
+
+
+Login & OTP protected
+
+
+Google:
+
+
+Verified via OAuth / OIDC
+
+
+12. PRODUCTION IMPROVEMENTS
+Redis for OTP + token blacklist
+
+
+Refresh token rotation
+
+
+Device/session tracking
+
+
+Email templates for OTP
+
+
+Audit logs for login attempts
+
+
+
+
+
+
+MODULE: PAYMENT (Order → Webhook → Confirmation Trigger)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+ and Payment-Service Flow 
+Pasted code
+
+
+)
+
+
+STATUS ENUM
+JSON
+
+
+{
+  "CREATED": "CREATED",
+  "SUCCESS": "SUCCESS",
+  "FAILED": "FAILED"
+}
+1. CREATE ORDER
+Endpoint
+http
+
+
+POST /api/payments/order
+Auth
+
+
+Required (Recommended)
+Request Payload
+JSON
+
+
+{
+  "appointmentId": "APT_001",
+  "amount": 500
+}
+Actual Processing
+Ignores client amount ❌
+
+
+Fetches server price via Admin Settings ✅
+
+
+Creates Razorpay order
+
+
+Stores Payment (CREATED)
+
+
+Updates Appointment with real orderId
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Order created",
+  "data": {
+    "id": "order_ABC123",
+    "entity": "order",
+    "amount": 249900,
+    "currency": "INR",
+    "status": "created"
+  }
+}
+Description
+Secure order creation (server-side pricing)
+
+
+Links payment ↔ appointment
+
+
+2. WEBHOOK (SOURCE OF TRUTH)
+Endpoint
+http
+
+
+POST /api/payments/webhook
+Auth
+
+
+Razorpay Signature Validation
+Headers
+
+
+x-razorpay-signature: <signature>
+Body
+JSON
+
+
+Razorpay Event Payload (RAW)
+CASE 1: PAYMENT SUCCESS
+Event
+JSON
+
+
+{
+  "event": "payment.captured"
+}
+Processing
+Verify webhook signature
+
+
+Check idempotency (paymentId)
+
+
+Update Payment → SUCCESS
+
+
+Trigger:
+
+
+
+
+Appointment Confirmation Queue
+DB Update
+JSON
+
+
+{
+  "status": "SUCCESS",
+  "paymentId": "pay_123",
+  "rawPayload": {}
+}
+CASE 2: PAYMENT FAILED
+Event
+JSON
+
+
+{
+  "event": "payment.failed"
+}
+Processing
+Update Payment → FAILED
+
+
+Success Response
+
+
+200 OK
+3. FRONTEND INTEGRATION GUIDE
+Full Payment Flow (CRITICAL FLOW)
+Step 1: Create Appointment
+JavaScript
+
+
+const { data } = await axios.post("/api/appointments", payload);
+const appointmentId = data.data._id;
+Step 2: Create Order
+JavaScript
+
+
+const res = await axios.post("/api/payments/order", {
+  appointmentId
+});
+
+
+const order = res.data.data;
+Step 3: Open Razorpay Checkout
+JavaScript
+
+
+const options = {
+  key: "RAZORPAY_KEY",
+  amount: order.amount,
+  currency: "INR",
+  order_id: order.id,
+
+
+  handler: async function (response) {
+    // OPTIONAL: Call confirm API (backup)
+    await axios.post(`/api/appointments/${appointmentId}/confirm`, {
+      razorpay_order_id: response.razorpay_order_id,
+      razorpay_payment_id: response.razorpay_payment_id,
+      razorpay_signature: response.razorpay_signature
+    });
+  }
+};
+
+
+new Razorpay(options).open();
+Step 4: Backend Webhook (REAL FLOW)
+Razorpay → webhook
+
+
+Backend:
+
+
+Verifies signature
+
+
+Marks payment SUCCESS
+
+
+Triggers appointment confirmation
+
+
+Step 5: UI Handling
+Poll appointment status OR
+
+
+Use WebSocket for real-time update
+
+
+4. DB INDEXING (CRITICAL)
+JavaScript
+
+
+// Fast lookup
+{ orderId: 1 }
+{ paymentId: 1 }
+
+
+// Idempotency
+{ orderId: 1, status: 1 }
+
+
+// Filters
+{ status: 1 }
+5. SECURITY NOTES (CRITICAL)
+❌ Never trust frontend amount
+
+
+✅ Always fetch price from server
+
+
+✅ Verify Razorpay webhook signature
+
+
+✅ Use RAW body for webhook
+
+
+✅ Idempotency check (paymentId unique)
+
+
+6. SYSTEM AUTOMATIONS
+Payment success → Appointment confirm queue
+
+
+Payment failed → Mark failed
+
+
+Appointment updated with real orderId
+
+
+Receipt generated post confirmation
+
+
+7. PRODUCTION IMPROVEMENTS
+Retry webhook processing (queue)
+
+
+Store webhook logs separately
+
+
+Add reconciliation job (cron)
+
+
+Add payment expiry handling
+
+
+
+
+
+
+
+
+MODULE: AI PRESCRIPTION (LLM → Draft → Final → Patient Access)
+(Aligned with Module 1 PRD 
+Module1_PRD
+
+
+  
+🔹 BASE CONFIG
+Base URL: /api/prescriptions
+
+
+Auth: Bearer JWT
+
+
+Headers
+JSON
+
+
+{
+  "Authorization": "Bearer <token>",
+  "Content-Type": "application/json"
+}
+🔹 DATA MODEL (RESPONSE SHAPE)
+JSON
+
+
+{
+  "_id": "prescription_id",
+  "appointmentId": "apt_id",
+  "sessionSummary": "string",
+  "focus": "string",
+  "provider": "string",
+  "dailyExercises": ["string"],
+  "weeklyPractice": ["string"],
+  "lifestyleGuidance": ["string"],
+  "followUp": "string",
+  "status": "draft | final",
+  "createdAt": "ISO",
+  "updatedAt": "ISO"
+}
+🔹 1. GET PRESCRIPTION
+📌 Endpoint
+GET /:appointmentId
+
+
+🔐 Auth Required: YES (ALL ROLES)
+✅ Response (SUCCESS)
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "appointmentId": "apt_id",
+    "sessionSummary": "Patient discussed anxiety triggers...",
+    "focus": "Anxiety management",
+    "provider": "Dr. Sharma",
+    "dailyExercises": ["Breathing exercise", "Journaling"],
+    "weeklyPractice": ["Therapy reflection"],
+    "lifestyleGuidance": ["Sleep 7-8 hours"],
+    "followUp": "Follow up in 2 weeks",
+    "status": "final"
+  },
+  "message": "Prescription fetched successfully."
+}
+❌ Errors
+Appointment not found
+
+
+JSON
+
+
+{
+  "statusCode": 404,
+  "data": null,
+  "message": "Appointment not found"
+}
+Prescription not generated
+
+
+JSON
+
+
+{
+  "statusCode": 404,
+  "data": null,
+  "message": "Prescription not generated yet."
+}
+Forbidden (Patient accessing others)
+
+
+JSON
+
+
+{
+  "statusCode": 403,
+  "data": null,
+  "message": "Forbidden: Not your session."
+}
+📌 Description
+Doctor/Admin → Full access
+
+
+Patient → ONLY:
+
+
+Their own appointment
+
+
+AND typically when prescription exists (final expected)
+
+
+💻 FRONTEND GUIDE
+PATIENT FLOW
+Call after session completion
+
+
+Poll or refresh until available
+
+
+Only show if:
+
+
+status === "final"
+
+
+DOCTOR FLOW
+Open after session / transcription ready
+
+
+Used for reviewing + editing draft
+
+
+🔹 2. UPDATE PRESCRIPTION (DRAFT EDIT)
+📌 Endpoint
+PATCH /:appointmentId
+
+
+🔐 Auth Required: YES (DOCTOR, ADMIN)
+✅ Request Body
+JSON
+
+
+{
+  "sessionSummary": "Updated summary",
+  "focus": "Stress management",
+  "provider": "Dr. Sharma",
+  "dailyExercises": ["Meditation"],
+  "weeklyPractice": ["Weekly journaling"],
+  "lifestyleGuidance": ["Avoid caffeine"],
+  "followUp": "Next session in 10 days"
+}
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "appointmentId": "apt_id",
+    "status": "draft"
+  },
+  "message": "Draft updated."
+}
+📌 Description
+Updates prescription in draft state
+
+
+Uses findOneAndUpdate
+
+
+Partial updates allowed
+
+
+💻 FRONTEND GUIDE
+Doctor editing UI:
+
+
+Form-based editable fields
+
+
+Auto-save optional:
+
+
+JavaScript
+
+
+debounce(() => PATCH /prescriptions/:id)
+🔹 3. FINALIZE PRESCRIPTION
+📌 Endpoint
+POST /:appointmentId/finalize
+
+
+🔐 Auth Required: YES (DOCTOR, ADMIN)
+✅ Request Body
+JSON
+
+
+{}
+✅ Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "appointmentId": "apt_id",
+    "status": "final"
+  },
+  "message": "Prescription published. Patient can now view it."
+}
+📌 Description
+Locks prescription
+
+
+Changes:
+
+
+JSON
+
+
+"status": "draft" → "final"
+Patient can now access
+
+
+💻 FRONTEND GUIDE
+Add “Publish” button
+
+
+Disable editing after final:
+
+
+JavaScript
+
+
+if (status === "final") disableForm()
+🔹 INTERNAL FLOW (IMPORTANT)
+🤖 AI GENERATION FLOW (AUTO TRIGGERED)
+JavaScript
+
+
+createPrescription({
+  appointmentId,
+  transcription
+})
+FLOW:
+Transcription ready
+
+
+Call generatePrescription() (LLM)
+
+
+Parse response safely
+
+
+Validate fields
+
+
+Save as:
+
+
+JSON
+
+
+{
+  "status": "draft"
+}
+🔹 SYSTEM RULES
+🔐 RBAC
+Role        Access
+PATIENT        Own + final only
+DOCTOR        Full
+ADMIN        Full
+
+
+🧠 DATA SAFETY
+Safe JSON parsing from LLM
+
+
+Default fallback values:
+
+
+JSON
+
+
+{
+  "dailyExercises": [],
+  "weeklyPractice": [],
+  "lifestyleGuidance": []
+}
+🔁 UPSERT LOGIC
+One prescription per appointment
+
+
+Re-generated → overwrites draft
+
+
+🔹 COMPLETE FRONTEND FLOW
+🎯 DOCTOR FLOW
+Session completed
+
+
+Wait for transcription → AI generates draft
+
+
+Open prescription page
+
+
+Edit fields
+
+
+Click Finalize
+
+
+🎯 PATIENT FLOW
+Open appointment details
+
+
+Call:
+
+
+http
+
+
+GET /prescriptions/:appointmentId
+If:
+
+
+JavaScript
+
+
+status !== "final" → show "Pending"
+If final:
+
+
+Show:
+
+
+Exercises
+
+
+Guidance
+
+
+Follow-up
+
+
+🔹 EDGE CASES
+AI fails → no prescription → 404
+
+
+Doctor skips editing → can directly finalize
+
+
+Multiple updates → always overwrite draft
+
+
+Final → immutable (frontend enforced)
+
+
+
+
+
+
+
+
+
+
+MODULE: Refund Module (Razorpay + Queue Based)
+Reference: 
+Module1_PRD
+
+
+
+
+1. AUTHORIZATION
+Middleware Applied
+authMiddleware
+
+
+roleMiddleware("ADMIN")
+
+
+Access Control
+Only ADMIN can initiate refund
+
+
+Requires valid JWT Token
+
+
+Headers
+JSON
+
+
+{
+  "Authorization": "Bearer <JWT_TOKEN>"
+}
+2. API CONTRACT
+2.1 INITIATE REFUND
+Endpoint
+
+
+
+
+POST /api/refund
+Request Payload
+JSON
+
+
+{
+  "paymentId": "pay_Ne8x123abc",
+  "appointmentId": "65f1c9a8e4b0a12a34567890",
+  "amount": 500
+}
+Field Description
+Field        Type        Required        Description
+paymentId        String        ✅        Razorpay payment ID
+appointmentId        ObjectId        ❌        Linked appointment
+amount        Number        ✅        Refund amount in INR
+
+
+Success Response (Queued)
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Refund initiated",
+  "data": {
+    "status": "QUEUED"
+  }
+}
+Success Response (Already Exists)
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Refund initiated",
+  "data": {
+    "_id": "65fabc...",
+    "paymentId": "pay_Ne8x123abc",
+    "refundId": "rfnd_123",
+    "amount": 500,
+    "status": "SUCCESS",
+    "createdAt": "2026-03-25T10:00:00Z",
+    "updatedAt": "2026-03-25T10:00:10Z"
+  }
+}
+Error Response
+JSON
+
+
+{
+  "statusCode": 401,
+  "message": "Unauthorized"
+}
+JSON
+
+
+{
+  "statusCode": 403,
+  "message": "Forbidden: ADMIN only"
+}
+JSON
+
+
+{
+  "statusCode": 500,
+  "message": "Internal Server Error"
+}
+3. DATABASE SCHEMA
+JSON
+
+
+{
+  "_id": "ObjectId",
+  "paymentId": "String",
+  "refundId": "String",
+  "appointmentId": "ObjectId",
+  "amount": 500,
+  "status": "INITIATED | SUCCESS | FAILED",
+  "rawResponse": {},
+  "createdAt": "Date",
+  "updatedAt": "Date"
+}
+Indexing Strategy
+paymentId → INDEX
+
+
+refundId → UNIQUE
+
+
+appointmentId → optional index
+
+
+4. FRONTEND INTEGRATION GUIDE
+Flow
+Only ADMIN users can access refund action
+
+
+Send paymentId, appointmentId, and amount to API
+
+
+API returns immediately with:
+
+
+QUEUED → refund processing started
+
+
+Existing refund → return stored result
+
+
+UI Handling
+If QUEUED:
+
+
+Show “Refund is being processed”
+
+
+Do not assume success immediately
+
+
+If existing refund returned:
+
+
+Show status (SUCCESS / FAILED)
+
+
+Recommended UI States
+Status        Meaning        UI Action
+QUEUED        Processing in background        Show loader / pending
+SUCCESS        Refund completed        Show success message
+FAILED        Refund failed        Show retry option
+
+
+Important Notes
+Refund is asynchronous (queue-based)
+
+
+Do not block UI waiting for final result
+
+
+Polling or webhook can be added later for real-time updates
+
+
+Always store and reuse paymentId to avoid duplicate refunds
+
+
+
+
+
+
+MODULE: Slot Module (Schedule + Override + Slot Engine)
+Reference: 
+Module1_PRD
+
+
+, 
+Pasted code
+
+
+
+
+1. AUTHORIZATION
+Public APIs
+No auth required:
+
+
+GET /api/slot
+
+
+Protected APIs
+API        Roles
+GET /doctor/me        DOCTOR, ADMIN
+POST /schedule        ADMIN, SUPER_ADMIN
+PUT /schedule/:id        ADMIN, SUPER_ADMIN
+PATCH /schedule/:id/toggle        ADMIN, SUPER_ADMIN
+PATCH /fixtures        DOCTOR, ADMIN, SUPER_ADMIN
+POST /override        AUTHENTICATED (ADMIN/DOCTOR)
+DELETE /override/:id        AUTHENTICATED
+POST /toggle-manual        AUTHENTICATED
+
+
+Headers
+JSON
+
+
+{
+  "Authorization": "Bearer <JWT_TOKEN>"
+}
+2. API CONTRACT
+2.1 GET SLOTS (PUBLIC)
+Endpoint
+
+
+
+
+GET /api/slot?doctorId=DOC_001&date=2026-03-25
+Query Params
+Param        Type        Required        Description
+doctorId        String        ✅        Doctor ID
+date        String (YYYY-MM-DD)        ✅        Slot date
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Slots fetched",
+  "data": [
+    {
+      "startTime": "10:00",
+      "endTime": "10:30",
+      "isBooked": false,
+      "isManuallyBlocked": false,
+      "isPast": false,
+      "isDisabled": false
+    }
+  ]
+}
+Error Response
+JSON
+
+
+{
+  "success": false,
+  "message": "Both 'doctorId' and 'date' are required query parameters"
+}
+2.2 GET DOCTOR FIXTURES
+Endpoint
+
+
+
+
+GET /api/slot/doctor/me
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Doctor fixtures fetched",
+  "data": [
+    {
+      "day": "MONDAY",
+      "startTime": "10:00",
+      "endTime": "18:00",
+      "isActive": true
+    }
+  ]
+}
+2.3 CREATE / UPDATE SCHEDULE
+Endpoint
+
+
+
+
+POST /api/slot/schedule
+Request Payload
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "dayOfWeek": 1,
+  "startTime": "10:00",
+  "endTime": "18:00",
+  "slotDuration": 30,
+  "bufferTime": 10
+}
+Field Description
+Field        Type        Description
+doctorId        String        Doctor ID
+dayOfWeek        Number (0-6)        Sunday–Saturday
+startTime        String        Start time
+endTime        String        End time
+slotDuration        Number        Slot length (minutes)
+bufferTime        Number        Gap between slots
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "message": "Schedule created",
+  "data": {
+    "_id": "65fabc...",
+    "doctorId": "DOC_001",
+    "dayOfWeek": 1,
+    "startTime": "10:00",
+    "endTime": "18:00",
+    "slotDuration": 30,
+    "bufferTime": 10,
+    "isActive": true
+  }
+}
+2.4 UPDATE SCHEDULE
+
+
+PUT /api/slot/schedule/:id
+Payload → same as create
+
+
+2.5 TOGGLE SCHEDULE
+
+
+PATCH /api/slot/schedule/:id/toggle
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Schedule toggled",
+  "data": {
+    "isActive": false
+  }
+}
+2.6 UPDATE DOCTOR FIXTURES
+
+
+PATCH /api/slot/fixtures
+Request Payload
+JSON
+
+
+{
+  "fixtures": [
+    {
+      "day": "MONDAY",
+      "startTime": "10:00",
+      "endTime": "18:00",
+      "isActive": true
+    }
+  ]
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Doctor fixtures updated",
+  "data": [
+    {
+      "day": "MONDAY",
+      "startTime": "10:00",
+      "endTime": "18:00",
+      "isActive": true
+    }
+  ]
+}
+2.7 CREATE OVERRIDE
+
+
+POST /api/slot/override
+Request Payload
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "date": "2026-03-25",
+  "type": "FULL_DAY_OFF",
+  "timeRanges": []
+}
+OR
+
+
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "date": "2026-03-25",
+  "type": "PARTIAL_UNAVAILABLE",
+  "timeRanges": [
+    {
+      "startTime": "12:00",
+      "endTime": "14:00"
+    }
+  ]
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "message": "Override created",
+  "data": {
+    "_id": "65fabc...",
+    "type": "FULL_DAY_OFF"
+  }
+}
+2.8 DELETE OVERRIDE
+
+
+DELETE /api/slot/override/:id
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Override deleted",
+  "data": null
+}
+2.9 TOGGLE MANUAL BLOCK
+
+
+POST /api/slot/toggle-manual
+Request Payload
+JSON
+
+
+{
+  "doctorId": "DOC_001",
+  "date": "2026-03-25",
+  "startTime": "10:00",
+  "endTime": "10:30"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Slot toggled",
+  "data": {
+    "_id": "65fabc...",
+    "type": "MANUAL_BLOCK"
+  }
+}
+3. DATABASE SCHEMA
+DoctorSchedule
+JSON
+
+
+{
+  "doctorId": "String",
+  "dayOfWeek": 1,
+  "startTime": "10:00",
+  "endTime": "18:00",
+  "slotDuration": 30,
+  "bufferTime": 10,
+  "isActive": true
+}
+AvailabilityOverride
+JSON
+
+
+{
+  "doctorId": "String",
+  "date": "Date",
+  "type": "FULL_DAY_OFF | PARTIAL_UNAVAILABLE | MANUAL_BLOCK",
+  "timeRanges": [
+    {
+      "startTime": "12:00",
+      "endTime": "14:00"
+    }
+  ],
+  "createdBy": "ADMIN | DOCTOR"
+}
+Indexing Strategy
+doctorId + dayOfWeek → UNIQUE (schedule)
+
+
+doctorId + date → INDEX (override lookup)
+
+
+doctorId → INDEX (slot generation)
+
+
+4. FRONTEND INTEGRATION GUIDE
+Core Flow
+Fetch slots using doctorId + date
+
+
+Backend:
+
+
+Applies weekly schedule
+
+
+Applies overrides (full day / partial / manual)
+
+
+Removes booked slots
+
+
+Marks disabled states
+
+
+Slot Object Meaning
+Field        Meaning
+isBooked        Already booked
+isManuallyBlocked        Blocked by doctor/admin
+isPast        Time already passed
+isDisabled        Cannot be selected
+
+
+Booking Logic
+Only allow booking when:
+
+
+isDisabled === false
+
+
+Doctor Panel Flow
+Fetch fixtures (/doctor/me)
+
+
+Update weekly schedule via fixtures API
+
+
+Toggle availability per day
+
+
+Admin Flow
+Create schedules for doctors
+
+
+Toggle schedule ON/OFF
+
+
+Add overrides:
+
+
+FULL_DAY_OFF → remove all slots
+
+
+PARTIAL_UNAVAILABLE → block time range
+
+
+Real-Time Behavior
+Slot availability is computed dynamically
+
+
+No slot stored in DB
+
+
+Always call API before booking
+
+
+Important Notes
+Manual block acts like toggle (create/delete)
+
+
+Overrides take priority over schedule
+
+
+Booked slots override everything
+
+
+Time is handled in minutes logic internally
+
+
+
+
+MODULE: Transcription Module (Deepgram + Structured Messages)
+Reference: 
+Module1_PRD
+
+
+   🔹 BASE CONFIG
+Base URL: /api/transcriptions
+
+
+Auth: Bearer JWT
+
+
+Access: DOCTOR, ADMIN ONLY
+
+
+Headers
+JSON
+
+
+{
+  "Authorization": "Bearer <token>",
+  "Content-Type": "application/json"
+}
+🔹 DATA MODEL (RESPONSE SHAPE)
+JSON
+
+
+{
+  "_id": "transcription_id",
+  "appointmentId": "apt_id",
+  "messages": [
+    {
+      "speaker": "THERAPIST",
+      "text": "How are you feeling today?",
+      "startTime": 0,
+      "endTime": 5
+    }
+  ],
+  "raw": {},
+  "status": "processing | completed | failed",
+  "createdAt": "ISO",
+  "updatedAt": "ISO"
+}
+🔹 1. GET TRANSCRIPTION
+📌 Endpoint
+GET /:appointmentId
+
+
+🔐 Auth Required: YES (DOCTOR, ADMIN)
+✅ Request Params
+JSON
+
+
+{
+  "appointmentId": "apt_id"
+}
+✅ Response (SUCCESS)
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "appointmentId": "apt_id",
+    "messages": [
+      {
+        "speaker": "THERAPIST",
+        "text": "Tell me what’s been bothering you.",
+        "startTime": 0,
+        "endTime": 4
+      },
+      {
+        "speaker": "PATIENT",
+        "text": "I feel anxious lately.",
+        "startTime": 5,
+        "endTime": 9
+      }
+    ],
+    "status": "completed"
+  },
+  "message": "Transcription fetched"
+}
+❌ Errors
+Missing appointmentId
+
+
+JSON
+
+
+{
+  "message": "appointmentId required"
+}
+Not Authorized
+
+
+JSON
+
+
+{
+  "message": "Forbidden"
+}
+📌 Description
+Fetches transcription linked to appointment
+
+
+Data already processed via Recall webhook
+
+
+No real-time transcription here
+
+
+🔹 SYSTEM BEHAVIOR
+⚙️ DATA SOURCE
+Populated ONLY via:
+
+
+
+
+Recall Webhook → transform → DB save
+🔁 UPSERT LOGIC
+JavaScript
+
+
+upsertByAppointment(appointmentId)
+Prevents duplicates
+
+
+Ensures idempotency
+
+
+📊 STATUS STATES
+Status        Meaning
+processing        Transcript not ready
+completed        Ready
+failed        Error in pipeline
+
+
+🔹 2. INTERNAL (ADMIN TOOL - OPTIONAL)
+🔁 REPROCESS TRANSCRIPTION (SERVICE ONLY)
+JavaScript
+
+
+reprocessTranscription(appointmentId)
+📌 Description
+Uses stored raw data
+
+
+Re-runs transformation logic
+
+
+Does NOT call Recall again
+
+
+🔹 FRONTEND GUIDE
+❌ PATIENT SIDE
+❌ NO ACCESS
+
+
+❌ NEVER CALL THIS API
+
+
+👉 Reason:
+
+
+Raw therapy conversations = sensitive
+
+
+✅ DOCTOR SIDE
+🎯 USE CASES
+Review session conversation
+
+
+Validate AI prescription
+
+
+Debug AI issues
+
+
+💻 FLOW
+Doctor opens session details
+
+
+Call:
+
+
+JavaScript
+
+
+GET /transcriptions/:appointmentId
+UI STATES
+JavaScript
+
+
+if (!data) show("No transcription yet")
+
+
+if (data.status === "processing")
+  show("Transcription in progress...")
+
+
+if (data.status === "failed")
+  show("Transcription failed")
+
+
+if (data.status === "completed")
+  renderMessages(data.messages)
+💻 DISPLAY FORMAT
+
+
+THERAPIST: How are you feeling?
+PATIENT: I feel anxious...
+✅ ADMIN SIDE
+Monitoring tool
+
+
+Debugging transcription issues
+
+
+Can reprocess (internal tool)
+
+
+🔹 COMPLETE FLOW (CONTEXT)
+🎯 END-TO-END PIPELINE
+Meeting happens
+
+
+Recall bot records
+
+
+Webhook triggered
+
+
+Transcript processed
+
+
+Stored in DB
+
+
+Doctor fetches via API
+
+
+🔹 SECURITY RULES
+🔐 STRICT RBAC
+Role        Access
+PATIENT        ❌ NO
+DOCTOR        ✅ YES
+ADMIN        ✅ YES
+
+
+🔒 SENSITIVE DATA
+Raw therapy conversation
+
+
+Must NOT be exposed to patient
+
+
+Only processed insights → Prescription
+
+
+🔹 KEY INSIGHT
+🔥 THIS MODULE IS:
+Read-only API
+
+
+Backend-driven (via Recall)
+
+
+Sensitive data layer
+
+
+⚠️ FRONTEND ROLE
+Role        Responsibility
+Patient        NONE
+Doctor        View transcript
+Admin        Debug
+
+
+❌ FRONTEND DOES NOT:
+Trigger transcription
+
+
+Process audio
+
+
+Call Recall
+
+
+
+
+
+
+
+
+
+
+MODULE: User Module (Roles + Doctor Approval + Admin Management)
+Reference: 
+Module1_PRD
+
+
+, 
+Pasted code
+
+
+
+
+1. AUTHORIZATION
+Roles
+Role        Access
+PATIENT        View doctors, apply doctor
+DOCTOR        View doctors
+ADMIN        Approve/reject doctor, manage users
+SUPER_ADMIN        Create admin + full access
+
+
+Middleware Usage
+authMiddleware → Required for protected APIs
+
+
+roleMiddleware(...) → Role-based restriction
+
+
+Headers
+JSON
+
+
+{
+  "Authorization": "Bearer <JWT_TOKEN>"
+}
+2. API CONTRACT
+2.1 GET PROFILE
+
+
+GET /api/user/me
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "65fabc...",
+    "name": "John Doe",
+    "email": "john@gmail.com",
+    "role": "PATIENT",
+    "status": "APPROVED",
+    "isActive": true
+  }
+}
+2.2 APPLY DOCTOR
+
+
+POST /api/user/apply-doctor
+Request Payload
+JSON
+
+
+{
+  "name": "Dr. Smith",
+  "email": "drsmith@gmail.com",
+  "phone": "9876543210"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "message": "Application submitted",
+  "data": {
+    "role": "DOCTOR",
+    "status": "PENDING"
+  }
+}
+2.3 APPROVE DOCTOR
+
+
+POST /api/user/approve-doctor
+Access
+ADMIN, SUPER_ADMIN
+
+
+Request Payload
+JSON
+
+
+{
+  "userId": "65fabc..."
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Doctor approved and credentials generated",
+  "data": {
+    "user": {
+      "_id": "65fabc...",
+      "role": "DOCTOR",
+      "status": "APPROVED"
+    },
+    "credentials": {
+      "userId": "DOC_001",
+      "password": "generated_password"
+    }
+  }
+}
+2.4 REJECT DOCTOR
+
+
+POST /api/user/reject-doctor
+Request Payload
+JSON
+
+
+{
+  "userId": "65fabc..."
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "Doctor rejected",
+  "data": {
+    "status": "REJECTED"
+  }
+}
+2.5 GET DOCTORS
+
+
+GET /api/user/doctors
+Behavior
+Caller        Result
+ADMIN / SUPER_ADMIN        All doctors
+PATIENT / DOCTOR        Only APPROVED + ACTIVE
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "65fabc...",
+      "name": "Dr. Smith",
+      "status": "APPROVED",
+      "isActive": true
+    }
+  ]
+}
+2.6 GET USER BY ID
+
+
+GET /api/user/:id
+Access
+ADMIN, SUPER_ADMIN
+
+
+Success Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "65fabc...",
+    "name": "User Name",
+    "role": "DOCTOR"
+  }
+}
+2.7 DEACTIVATE USER
+
+
+PATCH /api/user/deactivate
+Request Payload
+JSON
+
+
+{
+  "userId": "65fabc..."
+}
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "User deactivated",
+  "data": {
+    "isActive": false
+  }
+}
+2.8 REACTIVATE USER
+
+
+PATCH /api/user/reactivate
+Request Payload
+JSON
+
+
+{
+  "userId": "65fabc..."
+}
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "message": "User reactivated",
+  "data": {
+    "isActive": true
+  }
+}
+2.9 CREATE ADMIN
+
+
+POST /api/user/create-admin
+Access
+SUPER_ADMIN ONLY
+
+
+Request Payload
+JSON
+
+
+{
+  "name": "Admin Name",
+  "email": "admin@gmail.com",
+  "phone": "9876543210"
+}
+Success Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "message": "Admin created successfully",
+  "data": {
+    "user": {
+      "role": "ADMIN"
+    },
+    "credentials": {
+      "userId": "ADMIN_001",
+      "password": "generated_password"
+    }
+  }
+}
+3. DATABASE SCHEMA
+JSON
+
+
+{
+  "_id": "ObjectId",
+  "userId": "DOC_001 / ADMIN_001",
+  "name": "String",
+  "email": "String",
+  "phone": "String",
+  "role": "PATIENT | DOCTOR | ADMIN | SUPER_ADMIN",
+  "status": "PENDING | APPROVED | REJECTED",
+  "isActive": true,
+  "authProviders": {
+    "google": {
+      "googleId": "String",
+      "isLinked": true
+    },
+    "credentials": {
+      "password": "hashed",
+      "isLinked": true
+    }
+  }
+}
+Indexing Strategy
+email → UNIQUE
+
+
+userId → UNIQUE (sparse)
+
+
+role + status → INDEX
+
+
+googleId → INDEX
+
+
+isActive → INDEX
+
+
+4. FRONTEND INTEGRATION GUIDE
+Core Flows
+Patient Flow
+Login via Google
+
+
+View doctors (/doctors)
+
+
+Apply as doctor (optional)
+
+
+Doctor Application Flow
+Submit application
+
+
+Status = PENDING
+
+
+Wait for admin approval
+
+
+Admin Flow
+Fetch all doctors
+
+
+Filter:
+
+
+PENDING → approve/reject
+
+
+On approval:
+
+
+System generates:
+
+
+userId (DOC_001)
+
+
+password
+
+
+Credentials sent via email
+
+
+Doctor Login Flow
+Uses:
+
+
+userId
+
+
+password
+
+
+Only after approval
+
+
+User Status Logic
+Status        Meaning
+PENDING        Awaiting approval
+APPROVED        Can login/use system
+REJECTED        Access denied
+
+
+Activation Logic
+isActive = false → user blocked
+
+
+isActive = true → user active
+
+
+Important Notes
+Password is auto-generated + hashed (argon2)
+
+
+Credentials are sent via email service
+
+
+Google login only for PATIENT
+
+
+Doctors/Admin use credentials login
+
+
+userId follows:
+
+
+DOCTOR → DOC_001
+
+
+ADMIN → ADMIN_001
+
+
+
+
+✅ MODULE: RECALL (BOT + TRANSCRIPTION PIPELINE)
+(Strict API Contract + Frontend Role Clarification)
+Context used: 
+Pasted code
+
+
+
+
+🔹 BASE CONFIG
+Base URL: /api/recall
+
+
+Auth: ❌ NO (Webhook endpoint)
+
+
+Used By: Recall.ai servers ONLY
+
+
+🔹 1. RECALL WEBHOOK (CORE API)
+📌 Endpoint
+POST /webhook
+
+
+🔐 Auth Required: NO (Validated via headers)
+✅ Headers (Sent by Recall)
+JSON
+
+
+{
+  "x-source": "recall",
+  "x-recall-signature": "signature_hash"
+}
+✅ Request Body (IMPORTANT EVENTS)
+🟡 EVENT: BOT STATUS CHANGE
+JSON
+
+
+{
+  "event": "bot.status_change",
+  "data": {
+    "status": {
+      "code": "in_call_recording"
+    },
+    "metadata": {
+      "appointmentId": "apt_id"
+    }
+  }
+}
+🟡 EVENT: RECORDING DONE
+JSON
+
+
+{
+  "event": "recording.done",
+  "data": {
+    "recording": {
+      "id": "recording_id"
+    },
+    "metadata": {
+      "appointmentId": "apt_id"
+    }
+  }
+}
+🟢 EVENT: TRANSCRIPT COMPLETE (MAIN)
+JSON
+
+
+{
+  "event": "transcript.done",
+  "data": {
+    "id": "transcript_id",
+    "metadata": {
+      "appointmentId": "apt_id"
+    }
+  }
+}
+✅ Response (MANDATORY FAST ACK)
+
+
+200 OK
+🔹 DESCRIPTION (CRITICAL FLOW)
+⚙️ FULL PIPELINE
+Recall Bot joins meeting
+
+
+Records audio
+
+
+Sends recording.done
+
+
+Backend triggers transcription (Gladia / fallback)
+
+
+Recall sends transcript.done
+
+
+Backend:
+
+
+Downloads transcript
+
+
+Cleans + transforms
+
+
+Saves to DB
+
+
+Queues AI Prescription
+
+
+🔹 INTERNAL PROCESSING (NO FRONTEND)
+🔹 STEP 1: VERIFY WEBHOOK
+Checks:
+
+
+x-source
+
+
+x-recall-signature (future strict validation)
+
+
+🔹 STEP 2: IDENTIFY APPOINTMENT
+JavaScript
+
+
+appointmentId = metadata.appointmentId
+🔹 STEP 3: DOWNLOAD TRANSCRIPT
+http
+
+
+GET /transcript/:id
+🔹 STEP 4: TRANSFORM TRANSCRIPT
+Output:
+
+
+JSON
+
+
+[
+  { "speaker": "THERAPIST", "text": "..." },
+  { "speaker": "PATIENT", "text": "..." }
+]
+Rules:
+
+
+Speaker mapping
+
+
+Merge continuous speech
+
+
+Remove empty text
+
+
+🔹 STEP 5: AI REFINEMENT
+JavaScript
+
+
+refineTranscript(messages)
+🔹 STEP 6: SAVE TO DB
+JSON
+
+
+{
+  "appointmentId": "apt_id",
+  "messages": [...],
+  "status": "completed"
+}
+🔹 STEP 7: QUEUE PRESCRIPTION
+JavaScript
+
+
+prescriptionQueue.add({
+  appointmentId,
+  transcription
+})
+🔹 BOT CREATION (INTERNAL API)
+📌 Used in Appointment Confirmation
+JavaScript
+
+
+createBot({
+  meetLink,
+  appointmentId,
+  startTime,
+  doctorName
+})
+🔹 BOT CONFIG
+JSON
+
+
+{
+  "meeting_url": "Google Meet Link",
+  "bot_name": "Calmscious Assistant",
+  "join_at": "startTime - 1 min",
+  "metadata": {
+    "appointmentId": "apt_id",
+    "doctorName": "Dr Name"
+  }
+}
+🔹 FRONTEND ROLE ❓ (IMPORTANT ANSWER)
+❌ DIRECT ROLE: NONE
+Frontend:
+
+
+❌ DOES NOT call /recall/webhook
+
+
+❌ DOES NOT handle transcription
+
+
+❌ DOES NOT interact with Recall API
+
+
+✅ INDIRECT ROLE (VERY IMPORTANT)
+Frontend is part of the trigger chain, not the pipeline.
+
+
+🎯 WHERE FRONTEND MATTERS
+1. AFTER PAYMENT SUCCESS
+JavaScript
+
+
+POST /appointments/:id/confirm
+👉 This triggers:
+
+
+Meet creation
+
+
+Bot creation (Recall)
+
+
+Entire pipeline starts
+
+
+2. DOCTOR SIDE (CRITICAL UX)
+Frontend MUST:
+
+
+Show meeting link
+
+
+Ensure doctor:
+
+
+Starts meeting ON TIME
+
+
+ADMITS BOT from waiting room
+
+
+⚠️ VERY IMPORTANT (REAL WORLD ISSUE)
+If doctor does NOT admit bot:
+
+
+👉 ❌ No recording
+👉 ❌ No transcription
+👉 ❌ No prescription
+
+
+💻 UI REQUIREMENT
+Doctor dashboard should show:
+
+
+
+
+⚠️ Admit "Calmscious Assistant" bot when it joins
+3. PATIENT SIDE
+Frontend should:
+
+
+Poll prescription API:
+
+
+JavaScript
+
+
+GET /prescriptions/:appointmentId
+STATES:
+State        Meaning
+No prescription        Processing
+draft        Doctor editing
+final        Ready
+
+
+UI Example:
+JavaScript
+
+
+if (!data) show("Processing session...")
+if (data.status === "draft") show("Doctor preparing prescription...")
+if (data.status === "final") showPrescription()
+🔹 SUMMARY
+🔥 BACKEND DOES EVERYTHING
+Bot creation
+
+
+Recording
+
+
+Transcription
+
+
+AI processing
+
+
+Queue handling
+
+
+🎯 FRONTEND RESPONSIBILITY
+Area        Responsibility
+Payment        Trigger confirm
+Doctor UI        Admit bot
+Patient UI        Show prescription
+Polling        Handle async nature
+
+
+❌ FRONTEND DOES NOT:
+Call Recall APIs
+
+
+Process audio
+
+
+Handle webhooks
+
+
+🔹 KEY INSIGHT (IMPORTANT FOR YOU)
+This module is 100% event-driven backend system
+
+
+Frontend is only:
+👉 Trigger + Display Layer
+Course Module
+
+
+🔐 AUTH & ROLE MATRIX
+API        Public        User        Doctor        Admin
+Get Courses        ✅        ✅        ✅        ✅
+Course Details        ✅        ✅        ✅        ✅
+Course Content        ❌        ✅ (purchased)        ❌        ❌
+My Courses        ❌        ✅        ❌        ❌
+Create Course        ❌        ❌        ✅        ✅
+Add Videos        ❌        ❌        ✅ (own)        ✅
+Bulk Add        ❌        ❌        ✅ (own)        ✅
+Reorder        ❌        ❌        ✅ (own)        ✅
+Update Thumbnail        ❌        ❌        ✅ (own)        ✅
+Approve Course        ❌        ❌        ❌        ✅
+
+
+🌍 1. GET ALL COURSES
+Endpoint
+http
+
+
+GET /api/courses
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "courseId",
+      "title": "Anxiety Mastery",
+      "thumbnail": "url",
+      "duration": "5h",
+      "adminPrice": 999,
+      "doctorPrice": 799
+    }
+  ]
+}
+Description
+Only APPROVED + isActive = true
+
+
+Used for explore page
+
+
+📖 2. COURSE DETAILS (LANDING PAGE)
+Endpoint
+http
+
+
+GET /api/courses/:courseId
+Auth
+Optional
+
+
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "_id": "courseId",
+    "title": "Anxiety Mastery",
+    "description": "...",
+    "duration": "5h",
+    "thumbnail": "url",
+    "price": 999,
+    "isPurchased": false,
+
+
+    "content": [
+      {
+        "_id": "contentId",
+        "title": "Intro",
+        "order": 1,
+        "isPreview": true
+      },
+      {
+        "_id": "contentId2",
+        "title": "Deep Session",
+        "order": 2,
+        "isPreview": false
+      }
+    ]
+  }
+}
+Description
+Full overview
+
+
+Playlist visible
+
+
+NO video URLs (secure)
+
+
+isPurchased drives UI
+
+
+🎬 3. COURSE CONTENT (PLAYER)
+Endpoint
+http
+
+
+GET /api/courses/:courseId/content
+Auth
+Required
+
+
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "contentId",
+      "title": "Intro",
+      "videoUrl": "youtube-embed-url",
+      "order": 1,
+      "isPreview": true
+    }
+  ]
+}
+Description
+Full playlist with video URLs
+
+
+Only if purchased
+
+
+Errors
+JSON
+
+
+403 Access denied
+404 Course not found
+📚 4. MY COURSES
+Endpoint
+http
+
+
+GET /api/courses/my/courses
+Auth
+Required
+
+
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": [
+    {
+      "_id": "purchaseId",
+      "courseId": {
+        "_id": "courseId",
+        "title": "Anxiety Mastery",
+        "thumbnail": "url",
+        "duration": "5h",
+        "description": "..."
+      }
+    }
+  ]
+}
+Description
+User library
+
+
+Used for dashboard
+
+
+🩺 5. CREATE COURSE
+Endpoint
+http
+
+
+POST /api/courses
+Auth
+Doctor / Admin
+
+
+Request
+JSON
+
+
+{
+  "title": "Stress Management",
+  "description": "...",
+  "doctorPrice": 799,
+  "duration": "4h"
+}
+Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "data": {
+    "_id": "courseId",
+    "status": "PENDING"
+  }
+}
+Description
+Created as PENDING
+
+
+Requires admin approval
+
+
+➕ 6. ADD VIDEO
+Endpoint
+http
+
+
+POST /api/courses/:courseId/videos
+Request
+JSON
+
+
+{
+  "title": "Session 1",
+  "videoUrl": "youtube embed url",
+  "isPreview": false
+}
+Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "data": {
+    "_id": "contentId",
+    "order": 3
+  }
+}
+Description
+Auto-order handled
+
+
+Only owner/admin
+
+
+📦 7. BULK ADD VIDEOS
+Endpoint
+http
+
+
+POST /api/courses/:courseId/bulk-videos
+Request
+JSON
+
+
+{
+  "videos": [
+    {
+      "title": "Session 2",
+      "videoUrl": "url"
+    },
+    {
+      "title": "Session 3",
+      "videoUrl": "url"
+    }
+  ]
+}
+Response
+JSON
+
+
+{
+  "statusCode": 201,
+  "data": [
+    { "_id": "id1", "order": 4 },
+    { "_id": "id2", "order": 5 }
+  ]
+}
+⚡ 8. REORDER PLAYLIST
+Endpoint
+http
+
+
+PATCH /api/courses/:courseId/reorder
+Request
+JSON
+
+
+{
+  "updates": [
+    { "contentId": "id1", "order": 1 },
+    { "contentId": "id2", "order": 2 }
+  ]
+}
+Description
+Bulk write → highly optimized
+
+
+📸 9. UPDATE THUMBNAIL
+Endpoint
+http
+
+
+PATCH /api/courses/:courseId/thumbnail
+Request (FormData)
+
+
+thumbnail: file
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "thumbnail": "s3-url"
+  }
+}
+👑 10. APPROVE COURSE (ADMIN)
+Endpoint
+http
+
+
+PATCH /api/courses/:courseId/approve
+Request
+JSON
+
+
+{
+  "adminPrice": 999
+}
+Response
+JSON
+
+
+{
+  "statusCode": 200,
+  "data": {
+    "status": "APPROVED",
+    "adminPrice": 999
+  }
+}
+💰 PAYMENT INTEGRATION
+After payment success:
+JavaScript
+
+
+await grantCourseAccess(userId, courseId, paymentId);
+🎯 FRONTEND FLOW (EXACT)
+🟢 FLOW 1: EXPLORE → BUY
+Call:
+
+
+http
+
+
+GET /courses
+Click course →
+
+
+http
+
+
+GET /courses/:id
+Show:
+
+
+description
+
+
+playlist
+
+
+locked videos
+
+
+User clicks “Buy”
+
+
+Add to checkout
+
+
+🟢 FLOW 2: AFTER PAYMENT
+Payment success
+
+
+Backend:
+
+
+JavaScript
+
+
+grantCourseAccess()
+User goes to:
+
+
+http
+
+
+GET /courses/my/courses
+🟢 FLOW 3: WATCH COURSE
+Open course
+
+
+Call:
+
+
+http
+
+
+GET /courses/:id/content
+Render:
+
+
+HTML
+
+
+
+
+
+
+
+
+<iframe src="videoUrl" />
+🟢 FLOW 4: DOCTOR DASHBOARD
+Create course
+
+
+Add videos
+
+
+Upload thumbnail
+
+
+Wait for approval
+
+
+🟢 FLOW 5: ADMIN PANEL
+Fetch pending courses
+
+
+Approve with price
+
+
+Course goes live
+
+
+⚠️ EDGE CASES (HANDLED)
+Duplicate purchase → prevented via unique index
+
+
+Unauthorized access → 403
+
+
+Non-approved course → hidden
+
+
+Playlist order conflict → resolved via bulk write
+
+
+Ownership violation → permission check
+
+
+🚀 FINAL STATUS
+This module is now:
+
+
+✅ FULLY PRODUCTION READY
+Role-based system ✔
+
+
+Secure content ✔
+
+
+Optimized DB ✔
+
+
+Scalable playlist ✔
+
+
+Admin control ✔
+
+
+Payment integration ✔
